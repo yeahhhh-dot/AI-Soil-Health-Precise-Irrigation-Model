@@ -493,4 +493,3 @@ st.markdown("""
 - [FAO: Soil and water](https://www.fao.org/4/r4082e/r4082e03.htm) — distinguishes saturation, field capacity and plant-available water.
 - [FAO: Irrigation water needs](https://www.fao.org/4/S2022E/s2022e08.htm) — explains crop water need, effective rainfall and irrigation need.
 """)
-

@@ -1,40 +1,50 @@
-# AI Soil Health & Precision Irrigation Simulator
+# Cotton Drip Irrigation Simulator — Khandesh, North Maharashtra
 
-A beginner-friendly Streamlit web app for an academic virtual-simulation project. It uses a Random Forest classifier and sliders to simulate sensor readings.
+A Streamlit classroom prototype with:
+- Fixed crop: cotton
+- Fixed region: Khandesh, North Maharashtra
+- Soil selector: sandy loam, clay loam, black soil, red-mixed-black soil, deep alluvial soil, black clayey soil, red soil, and red + red-mixed-black soil
+- Seasonal selection: April–June, July–September, October–December, January–March
+- Random Forest regression for irrigation depth (mm)
+- A transparent water-balance calculation to convert a soil-moisture deficit into net/gross depth, litres for an area, required L/h over a one-hour delivery, and runtime at entered emitter capacity
+- CSV training template and 100 simulated demonstration conditions
 
-## Important scientific limitation
+## Important scientific limits
 
-`sample_training_data_demo.csv` is **synthetic demonstration data**. Its `irrigation_class` labels are created using illustrative rules, not measured irrigation decisions from a field study. It is included only so the app can be launched and tested immediately.
+The built-in 100 rows are synthetic scenarios whose irrigation-depth labels were calculated from the same simplified water-balance equation used by the app. They are for testing the interface and regression workflow only. Their test MAE/RMSE/R² are not evidence of real-world accuracy.
 
-For a research-backed model, replace the demo data with a labelled dataset and cite its source. The CSV must contain the following exact columns:
+The default field-capacity and saturation moisture values attached to soil labels are editable placeholders, not measured hydraulic values for every Khandesh field. Replace them with lab values or verified local published data. Soil labels alone cannot determine exact hydraulic properties.
 
-- `soil_moisture_pct` — soil moisture in percent
-- `soil_temperature_c` — soil temperature in degrees Celsius
-- `soil_ph` — soil pH
-- `electrical_conductivity_ds_m` — EC in dS/m (mS/cm is numerically equivalent)
-- `air_temperature_c` — air temperature in degrees Celsius
-- `relative_humidity_pct` — relative humidity in percent
-- `rainfall_24h_mm` — rainfall in the previous 24 hours, in millimetres
-- `crop_type` — crop name/category
-- `irrigation_class` — target label: `No irrigation`, `Moderate irrigation`, or `High irrigation`
+Moisture input must be volumetric water content (VWC, % by volume), or a calibrated conversion to VWC. A sensor output from 0–100 is not automatically VWC.
 
-The app cannot learn the three categories from sensor inputs alone: a supervised classifier needs a target label for each training row. If a source gives only numeric irrigation amounts, document defensible class thresholds based on a crop/soil agronomic reference and convert the amounts into classes before training. Do not invent labels and describe them as observed results.
+Routine irrigation toward 95–100% saturation is generally not recommended. Field capacity is the default. Near-saturation mode is included only as an educational option and can cause waterlogging or deep percolation. FAO describes the distinction between saturation and field capacity: https://www.fao.org/4/r4082e/r4082e03.htm
 
-## How to prepare real research data
+The volume calculation assumes the current moisture represents the entered root-zone depth and a uniform refill over the entered area. Real drip patterns depend on crop growth stage, root-zone depth, emitter spacing/discharge, wetted area, soil hydraulic conductivity, irrigation efficiency and field variability. Get agronomic/lab values before interpreting results as recommendations.
 
-1. Pick **one crop and a defined soil/site** for a manageable first model (for example, tomato in a specified soil type).
-2. Download the published dataset and read its methods/data dictionary.
-3. Convert measurements into the units listed above. Examples: Kelvin to °C = K − 273.15; volumetric water content in m³/m³ to percent = value × 100.
-4. Align records by the same location and date/time before joining datasets. Do not join unrelated rows just because the columns have similar names.
-5. Make sure each row has a defensible `irrigation_class` label based on recorded irrigation decisions/amounts or a clearly documented crop-specific threshold method.
-6. Save the prepared data as CSV, upload it in the app, and save the test-set metrics for your report.
+Previous-24-hour rainfall is available as a model feature but is not subtracted a second time from the transparent refill equation because current measured soil moisture should already reflect rain that reached the measured zone.
 
-## Algorithm outline
+## Run locally
 
-- Numeric sensor inputs: median imputation for missing values.
-- Crop type: one-hot encoding.
-- Model: `RandomForestClassifier` (300 trees, class-weight balanced, fixed random seed).
-- Evaluation: 25% held-out test split; accuracy, per-class precision/recall/F1, and confusion matrix.
-- Prediction: class and model probabilities.
+```bash
+python -m pip install -r requirements.txt
+streamlit run app.py
+```
 
-The model probabilities are not guaranteed to be calibrated probabilities. This is an educational prototype, not a certified agricultural decision-support system.
+## Deploy with GitHub and Streamlit Community Cloud
+
+1. Upload `app.py`, `requirements.txt`, `README.md`, `data_template.csv`, and `demo_100_conditions.csv` to the root of a GitHub repository.
+2. In Streamlit Community Cloud, create an app linked to that repository and branch `main`.
+3. Set main file path to `app.py` and deploy.
+
+## Training template for real data
+
+`data_template.csv` contains the column names required for supervised Random Forest regression. The target `irrigation_depth_mm` should be the observed gross irrigation depth in mm for the corresponding irrigation event. The input values must be aligned to the same field/event and use consistent units. If a paper reports litres or m³/ha, document and convert the quantity to an equivalent depth (1 mm = 10 m³/ha; 1 mm over 1 m² = 1 L).
+
+A paper containing only soil moisture readings, without a corresponding irrigation amount/decision, cannot by itself train a supervised irrigation-volume regressor. Cite source papers and record site, sampling dates, measurement depth, methods, missing-value handling and every conversion.
+
+## Sources to begin a literature review
+
+- Central Ground Water Board, Jalgaon district: https://www.cgwb.gov.in/sites/default/files/2022-11/jalgaon_f.pdf
+- Maharashtra Bt cotton drip/fertigation field study (Rahuri): https://pub.isa-india.in/index.php/ija/article/view/5660
+- FAO, soil water properties: https://www.fao.org/4/r4082e/r4082e03.htm
+- FAO, irrigation water needs: https://www.fao.org/4/S2022E/s2022e08.htm
