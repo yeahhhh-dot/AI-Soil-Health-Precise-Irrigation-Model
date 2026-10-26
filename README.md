@@ -20,25 +20,6 @@ For a research-backed model, replace the demo data with a labelled dataset and c
 
 The app cannot learn the three categories from sensor inputs alone: a supervised classifier needs a target label for each training row. If a source gives only numeric irrigation amounts, document defensible class thresholds based on a crop/soil agronomic reference and convert the amounts into classes before training. Do not invent labels and describe them as observed results.
 
-## Run on Windows (recommended)
-
-1. Install Python 3.11 or 3.12 from https://www.python.org/downloads/ . During setup, tick **Add Python to PATH**.
-2. Extract this ZIP to a folder.
-3. Open Command Prompt in that folder (File Explorer address bar: type `cmd` and press Enter).
-4. Run:
-
-   ```bat
-   py -m venv .venv
-   .venv\Scripts\activate
-   py -m pip install -r requirements.txt
-   streamlit run app.py
-   ```
-
-5. The app opens in your browser, usually at `http://localhost:8501`. Keep the Command Prompt open while using it.
-6. Use the sidebar to run the illustrative demo or upload your labelled CSV.
-
-If `py` is not recognised, try `python` instead.
-
 ## How to prepare real research data
 
 1. Pick **one crop and a defined soil/site** for a manageable first model (for example, tomato in a specified soil type).
