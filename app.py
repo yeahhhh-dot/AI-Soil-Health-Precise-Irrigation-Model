@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-import hashlib
-import json
 
 import pandas as pd
 import streamlit as st
@@ -137,97 +135,75 @@ with single_tab:
         st.metric("Region", "Khandesh, North Maharashtra")
         st.metric("Crop", "Cotton")
 
-    scenario = {
-        "soil_type": soil_type,
-        "season": season,
-        "crop_stage": crop_stage,
-        "area_m2": area_m2,
-        "current_soil_moisture_vwc_pct": current_moisture,
-        "soil_temperature_c": soil_temp,
-        "air_temperature_c": air_temp,
-        "relative_humidity_pct": humidity,
-        "rainfall_previous_24h_mm": rain_previous,
-        "forecast_rain_next_24h_mm": rain_forecast,
-        "soil_ph": soil_ph,
-        "electrical_conductivity_ds_m": ec,
-        "irrigation_efficiency_pct": efficiency_pct,
-    }
-    overrides = {
-        "field_capacity_vwc_pct": field_capacity,
-        "saturation_vwc_pct": saturation,
-        "effective_root_zone_depth_cm": root_depth_cm,
-    }
-    scenario_signature = json.dumps({"scenario": scenario, "overrides": overrides}, sort_keys=True)
-
-    st.subheader("4. Calculate irrigation requirement")
-    calculate_single = st.button(
-        "💧 Calculate irrigation requirement",
-        type="primary",
-        key="calculate_single_scenario",
-        use_container_width=True,
-    )
-
-    if calculate_single:
-        st.session_state["single_result_signature"] = scenario_signature
-        st.session_state["single_result"] = None
-        st.session_state["single_error"] = None
-        if field_capacity >= saturation:
-            st.session_state["single_error"] = "Invalid soil parameters: field capacity must be lower than saturation."
-        elif current_moisture > saturation:
-            st.session_state["single_error"] = "Current moisture is greater than the saturation value for the selected parameter set. Check the units/parameters."
+    st.subheader("4. Calculated irrigation requirement")
+    if field_capacity >= saturation:
+        st.error("Invalid soil parameters: field capacity must be lower than saturation.")
+    elif current_moisture > saturation:
+        st.error("Current moisture is greater than the saturation value for the selected parameter set. Check the units/parameters.")
+    else:
+        scenario = {
+            "soil_type": soil_type,
+            "season": season,
+            "crop_stage": crop_stage,
+            "area_m2": area_m2,
+            "current_soil_moisture_vwc_pct": current_moisture,
+            "soil_temperature_c": soil_temp,
+            "air_temperature_c": air_temp,
+            "relative_humidity_pct": humidity,
+            "rainfall_previous_24h_mm": rain_previous,
+            "forecast_rain_next_24h_mm": rain_forecast,
+            "soil_ph": soil_ph,
+            "electrical_conductivity_ds_m": ec,
+            "irrigation_efficiency_pct": efficiency_pct,
+        }
+        overrides = {
+            "field_capacity_vwc_pct": field_capacity,
+            "saturation_vwc_pct": saturation,
+            "effective_root_zone_depth_cm": root_depth_cm,
+        }
+        try:
+            result = evaluate_scenario(scenario, parameters, parameter_overrides=overrides)
+        except Exception as exc:
+            st.error(f"Cannot calculate this scenario: {exc}")
         else:
-            try:
-                st.session_state["single_result"] = evaluate_scenario(
-                    scenario, parameters, parameter_overrides=overrides
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("Required flow for 1 hour", f"{result['required_flow_for_one_hour_lph']:,.1f} L/h")
+            k2.metric("Gross water volume", f"{result['gross_water_volume_l']:,.1f} L")
+            k3.metric("Gross refill depth", f"{result['gross_applied_depth_mm']:.2f} mm")
+            k4.metric("Target VWC", f"{result['target_moisture_vwc_pct']:.2f}%")
+
+            k5, k6, k7, k8 = st.columns(4)
+            k5.metric("Net refill depth", f"{result['net_refill_depth_mm']:.2f} mm")
+            k6.metric("Net water volume", f"{result['net_water_volume_l']:,.1f} L")
+            k7.metric("Target selected by fuzzy logic", f"{result['target_pct_of_field_capacity']:.2f}% of FC")
+            k8.metric("Vapour-pressure deficit", f"{result['vapour_pressure_deficit_kpa']:.2f} kPa")
+
+            if result["irrigation_needed_now"]:
+                st.info(f"**Fuzzy priority: {result['fuzzy_priority']}** (score {result['fuzzy_priority_score']:.1f}/100). {result['recommendation']}")
+            else:
+                st.success(result["recommendation"])
+
+            with st.expander("Calculation details"):
+                st.code(
+                    "target VWC = field capacity × fuzzy target fraction\n"
+                    "net refill depth (mm) = max(0, target VWC − current VWC) / 100 × root depth (mm)\n"
+                    "net volume (L) = net refill depth (mm) × area (m²)\n"
+                    "gross volume (L) = net volume / (drip efficiency / 100)\n"
+                    "required flow (L/h) = gross volume (L) / 1 hour"
                 )
-            except Exception as exc:
-                st.session_state["single_error"] = f"Cannot calculate this scenario: {exc}"
+                detail_cols = [
+                    "field_capacity_vwc_pct", "saturation_vwc_pct", "effective_root_zone_depth_cm",
+                    "current_soil_moisture_vwc_pct", "target_moisture_vwc_pct", "deficit_pct_of_field_capacity",
+                    "net_refill_depth_mm", "gross_applied_depth_mm", "net_water_volume_l", "gross_water_volume_l",
+                    "irrigation_efficiency_pct", "fuzzy_priority_score", "fuzzy_priority", "parameter_status"
+                ]
+                st.dataframe(pd.DataFrame([{key: result[key] for key in detail_cols}]), use_container_width=True)
 
-    saved_signature = st.session_state.get("single_result_signature")
-    if saved_signature != scenario_signature:
-        st.info("Change the settings above, then click **Calculate irrigation requirement** to update the result.")
-    elif st.session_state.get("single_error"):
-        st.error(st.session_state["single_error"])
-    elif st.session_state.get("single_result") is not None:
-        result = st.session_state["single_result"]
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Required flow for 1 hour", f"{result['required_flow_for_one_hour_lph']:,.1f} L/h")
-        k2.metric("Gross water volume", f"{result['gross_water_volume_l']:,.1f} L")
-        k3.metric("Gross refill depth", f"{result['gross_applied_depth_mm']:.2f} mm")
-        k4.metric("Target VWC", f"{result['target_moisture_vwc_pct']:.2f}%")
-
-        k5, k6, k7, k8 = st.columns(4)
-        k5.metric("Net refill depth", f"{result['net_refill_depth_mm']:.2f} mm")
-        k6.metric("Net water volume", f"{result['net_water_volume_l']:,.1f} L")
-        k7.metric("Target selected by fuzzy logic", f"{result['target_pct_of_field_capacity']:.2f}% of FC")
-        k8.metric("Vapour-pressure deficit", f"{result['vapour_pressure_deficit_kpa']:.2f} kPa")
-
-        if result["irrigation_needed_now"]:
-            st.info(f"**Fuzzy priority: {result['fuzzy_priority']}** (score {result['fuzzy_priority_score']:.1f}/100). {result['recommendation']}")
-        else:
-            st.success(result["recommendation"])
-
-        with st.expander("Calculation details"):
-            st.code(
-                "target VWC = field capacity × fuzzy target fraction\n"
-                "net refill depth (mm) = max(0, target VWC − current VWC) / 100 × root depth (mm)\n"
-                "net volume (L) = net refill depth (mm) × area (m²)\n"
-                "gross volume (L) = net volume / (drip efficiency / 100)\n"
-                "required flow (L/h) = gross volume (L) / 1 hour"
+            st.warning(
+                "This is the theoretical flow needed to apply the estimated root-zone refill volume within one hour. "
+                "If the number is large, it does not mean a drip system should actually apply that flow continuously: "
+                "the field's irrigation design and soil's ability to accept water need separate engineering/agronomic review."
             )
-            detail_cols = [
-                "field_capacity_vwc_pct", "saturation_vwc_pct", "effective_root_zone_depth_cm",
-                "current_soil_moisture_vwc_pct", "target_moisture_vwc_pct", "deficit_pct_of_field_capacity",
-                "net_refill_depth_mm", "gross_applied_depth_mm", "net_water_volume_l", "gross_water_volume_l",
-                "irrigation_efficiency_pct", "fuzzy_priority_score", "fuzzy_priority", "parameter_status"
-            ]
-            st.dataframe(pd.DataFrame([{key: result[key] for key in detail_cols}]), use_container_width=True)
-
-        st.warning(
-            "This is the theoretical flow needed to apply the estimated root-zone refill volume within one hour. "
-            "If the number is large, it does not mean a drip system should actually apply that flow continuously: "
-            "the field's irrigation design and soil's ability to accept water need separate engineering/agronomic review."
-        )
 
 with batch_tab:
     st.subheader("Test the logic against 100 sample observations")
@@ -253,7 +229,7 @@ with batch_tab:
         input_df = demo_df
         dataset_label = "Built-in synthetic 100-observation test set"
 
-    st.caption(f"Dataset selected: {dataset_label} · Rows: {len(input_df)}")
+    st.caption(f"Dataset: {dataset_label} · Rows: {len(input_df)}")
     st.dataframe(input_df.head(12), use_container_width=True)
     st.download_button(
         "Download the 100-observation sample CSV",
@@ -275,57 +251,22 @@ with batch_tab:
         "irrigation_efficiency_pct", "soil_ph", "electrical_conductivity_ds_m",
     ]
     missing = [col for col in required_input if col not in input_df.columns]
-    input_signature = hashlib.sha256(input_df.to_csv(index=False).encode("utf-8")).hexdigest()
-
-    run_col, clear_col = st.columns([2, 1])
-    with run_col:
-        run_batch = st.button(
-            "▶ Run all scenarios",
-            type="primary",
-            key="run_batch_scenarios",
-            use_container_width=True,
-        )
-    with clear_col:
-        clear_batch = st.button("Clear previous results", key="clear_batch_results", use_container_width=True)
-
-    if clear_batch:
-        st.session_state.pop("batch_result_df", None)
-        st.session_state.pop("batch_result_signature", None)
-        st.rerun()
-
-    if run_batch:
-        if missing:
-            st.error("The CSV is missing these required columns: " + ", ".join(missing))
-            st.session_state.pop("batch_result_df", None)
-            st.session_state.pop("batch_result_signature", None)
-        else:
-            results: list[dict[str, Any]] = []
-            with st.spinner("Running the fuzzy logic on each scenario..."):
-                for _, in_row in input_df.iterrows():
-                    scenario = in_row.to_dict()
-                    try:
-                        output = evaluate_scenario(scenario, parameters)
-                        output["processing_status"] = "OK"
-                        output["error_message"] = ""
-                    except Exception as exc:
-                        output = {
-                            "scenario_id": scenario.get("scenario_id", ""),
-                            "soil_type": scenario.get("soil_type", ""),
-                            "season": scenario.get("season", ""),
-                            "crop_stage": scenario.get("crop_stage", ""),
-                            "processing_status": "ERROR",
-                            "error_message": str(exc),
-                        }
-                    results.append(output)
-            st.session_state["batch_result_df"] = pd.DataFrame(results)
-            st.session_state["batch_result_signature"] = input_signature
-
     if missing:
-        st.error("The selected CSV is missing these required columns: " + ", ".join(missing))
-    elif st.session_state.get("batch_result_signature") != input_signature:
-        st.info("Click **Run all scenarios** to calculate outputs for the selected dataset.")
-    elif "batch_result_df" in st.session_state:
-        result_df = st.session_state["batch_result_df"]
+        st.error("The CSV is missing these required columns: " + ", ".join(missing))
+    else:
+        results: list[dict[str, Any]] = []
+        for _, in_row in input_df.iterrows():
+            scenario = in_row.to_dict()
+            try:
+                output = evaluate_scenario(scenario, parameters)
+                output["processing_status"] = "OK"
+                output["error_message"] = ""
+            except Exception as exc:
+                output = {"scenario_id": scenario.get("scenario_id", ""), "soil_type": scenario.get("soil_type", ""),
+                          "season": scenario.get("season", ""), "crop_stage": scenario.get("crop_stage", ""),
+                          "processing_status": "ERROR", "error_message": str(exc)}
+            results.append(output)
+        result_df = pd.DataFrame(results)
         success_n = int((result_df["processing_status"] == "OK").sum())
         error_n = len(result_df) - success_n
         m1, m2, m3 = st.columns(3)
