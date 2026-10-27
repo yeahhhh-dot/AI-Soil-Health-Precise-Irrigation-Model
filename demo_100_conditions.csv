@@ -1,0 +1,101 @@
+scenario_id,soil_type,season,crop_stage,area_m2,current_soil_moisture_vwc_pct,soil_temperature_c,air_temperature_c,relative_humidity_pct,rainfall_previous_24h_mm,forecast_rain_next_24h_mm,irrigation_efficiency_pct,soil_ph,electrical_conductivity_ds_m
+SCN-001,Black soil,January-March,Establishment,20.0,13.67,31.83,35.79,68.1,0.0,0.0,85.0,5.97,2.96
+SCN-002,Red soil,January-March,Establishment,20.0,21.12,30.77,33.93,60.8,0.0,0.0,85.0,8.22,1.49
+SCN-003,Black soil,April-June,Establishment,10.0,32.31,35.2,38.32,39.2,2.31,27.49,92.0,7.04,3.11
+SCN-004,Red soil,April-June,Establishment,20.0,21.86,40.62,41.89,51.8,0.0,32.27,95.0,7.77,1.28
+SCN-005,Black soil,July-September,Establishment,20.0,34.83,29.59,31.31,55.4,55.73,0.0,85.0,6.58,3.22
+SCN-006,Red soil,July-September,Establishment,50.0,21.3,31.37,32.99,58.0,34.86,36.67,92.0,6.45,3.15
+SCN-007,Black soil,October-December,Establishment,50.0,36.3,17.54,22.39,51.0,0.0,5.78,95.0,7.01,2.53
+SCN-008,Red soil,October-December,Establishment,10.0,20.3,25.91,31.77,76.6,3.53,0.86,85.0,7.68,1.62
+SCN-009,Black soil,January-March,Vegetative growth and squaring,20.0,12.09,24.28,26.12,27.9,0.0,0.0,95.0,6.83,1.36
+SCN-010,Red soil,January-March,Vegetative growth and squaring,10.0,22.79,20.5,26.26,58.4,0.0,0.0,85.0,6.04,1.12
+SCN-011,Black soil,April-June,Vegetative growth and squaring,50.0,36.24,32.76,34.11,30.7,1.71,0.0,95.0,7.04,2.03
+SCN-012,Red soil,April-June,Vegetative growth and squaring,50.0,7.51,24.62,31.26,40.7,0.0,0.0,85.0,6.63,2.08
+SCN-013,Black soil,July-September,Vegetative growth and squaring,50.0,32.1,31.98,33.0,56.1,1.21,48.14,95.0,7.67,0.77
+SCN-014,Red soil,July-September,Vegetative growth and squaring,10.0,19.06,20.46,26.03,79.5,26.2,14.88,95.0,5.52,1.54
+SCN-015,Black soil,October-December,Vegetative growth and squaring,10.0,29.05,27.02,31.96,59.7,0.0,3.32,92.0,6.79,1.04
+SCN-016,Red soil,October-December,Vegetative growth and squaring,50.0,15.17,22.24,28.43,49.5,0.0,9.17,85.0,7.82,3.39
+SCN-017,Black soil,January-March,Flowering,20.0,32.61,22.05,26.9,68.0,0.0,2.3,85.0,8.37,2.85
+SCN-018,Red soil,January-March,Flowering,20.0,15.42,19.36,24.63,29.0,0.0,5.5,90.0,6.5,1.95
+SCN-019,Black soil,April-June,Flowering,20.0,15.5,37.71,39.8,44.2,0.0,11.8,92.0,6.35,2.48
+SCN-020,Red soil,April-June,Flowering,50.0,13.37,27.58,33.8,45.8,0.0,0.0,95.0,7.43,1.91
+SCN-021,Black soil,July-September,Flowering,50.0,28.21,22.88,27.21,79.1,0.0,6.59,95.0,7.47,3.1
+SCN-022,Red soil,July-September,Flowering,20.0,13.95,24.83,26.45,79.7,41.92,0.0,95.0,6.88,1.67
+SCN-023,Black soil,October-December,Flowering,10.0,17.57,18.43,21.49,79.6,2.35,0.0,85.0,8.03,3.26
+SCN-024,Red soil,October-December,Flowering,20.0,12.81,26.47,32.6,40.2,0.0,11.23,90.0,6.28,2.12
+SCN-025,Black soil,January-March,Boll development,50.0,26.07,34.02,35.33,69.9,6.21,0.0,90.0,8.14,1.04
+SCN-026,Red soil,January-March,Boll development,20.0,7.21,24.64,31.3,28.7,0.0,0.0,95.0,6.92,2.75
+SCN-027,Black soil,April-June,Boll development,10.0,16.44,34.04,39.01,34.2,0.0,0.0,90.0,5.63,0.72
+SCN-028,Red soil,April-June,Boll development,20.0,7.08,29.32,33.47,33.4,5.64,10.95,95.0,7.13,0.93
+SCN-029,Black soil,July-September,Boll development,10.0,30.57,24.66,31.46,81.0,5.4,6.75,85.0,6.91,1.14
+SCN-030,Red soil,July-September,Boll development,10.0,15.87,25.49,31.43,58.3,0.0,0.0,95.0,6.48,1.99
+SCN-031,Black soil,October-December,Boll development,20.0,15.95,23.95,28.91,73.4,1.13,5.38,92.0,6.35,1.26
+SCN-032,Red soil,October-December,Boll development,20.0,19.72,21.38,22.76,49.5,0.0,0.0,90.0,8.15,0.99
+SCN-033,Black soil,January-March,Boll opening and maturity,50.0,28.4,27.7,30.56,27.7,0.0,0.0,95.0,7.51,2.22
+SCN-034,Red soil,January-March,Boll opening and maturity,20.0,8.35,15.1,20.05,64.5,0.0,0.0,95.0,6.26,2.42
+SCN-035,Black soil,April-June,Boll opening and maturity,50.0,28.51,40.3,42.12,58.5,0.0,8.16,92.0,6.37,0.32
+SCN-036,Red soil,April-June,Boll opening and maturity,10.0,21.12,36.97,38.17,40.1,0.0,23.7,90.0,7.76,0.71
+SCN-037,Black soil,July-September,Boll opening and maturity,50.0,29.39,30.02,33.09,84.1,24.03,0.0,92.0,8.03,3.4
+SCN-038,Red soil,July-September,Boll opening and maturity,10.0,22.38,21.7,24.23,83.3,49.75,0.0,90.0,8.04,0.49
+SCN-039,Black soil,October-December,Boll opening and maturity,50.0,29.96,30.58,32.4,62.1,0.0,0.0,90.0,6.57,3.26
+SCN-040,Red soil,October-December,Boll opening and maturity,20.0,14.28,16.87,23.39,49.1,0.0,0.0,90.0,6.68,2.55
+SCN-041,Black soil,January-March,Establishment,20.0,26.01,22.39,23.87,59.9,0.0,0.0,95.0,7.31,0.54
+SCN-042,Red soil,January-March,Establishment,10.0,7.84,23.17,25.03,61.0,0.0,0.0,92.0,6.12,0.55
+SCN-043,Black soil,April-June,Establishment,20.0,32.06,27.91,33.45,52.5,0.0,0.0,90.0,5.92,1.51
+SCN-044,Red soil,April-June,Establishment,50.0,23.19,29.73,31.38,51.0,0.0,0.0,90.0,6.85,2.56
+SCN-045,Black soil,July-September,Establishment,10.0,35.63,30.9,33.21,59.7,4.45,16.41,92.0,7.43,3.15
+SCN-046,Red soil,July-September,Establishment,50.0,18.35,23.46,27.93,59.6,27.88,38.16,92.0,5.52,1.29
+SCN-047,Black soil,October-December,Establishment,10.0,15.2,22.87,27.69,50.2,0.0,0.0,95.0,6.42,2.04
+SCN-048,Red soil,October-December,Establishment,50.0,20.77,16.46,21.36,69.1,0.0,0.0,90.0,8.3,1.87
+SCN-049,Black soil,January-March,Vegetative growth and squaring,20.0,35.52,27.53,32.97,20.9,0.0,0.0,95.0,5.62,0.42
+SCN-050,Red soil,January-March,Vegetative growth and squaring,20.0,22.03,21.91,24.42,44.0,0.0,0.0,85.0,7.74,2.04
+SCN-051,Black soil,April-June,Vegetative growth and squaring,50.0,17.71,41.06,42.84,58.6,3.9,11.71,92.0,5.71,0.89
+SCN-052,Red soil,April-June,Vegetative growth and squaring,20.0,16.08,39.84,42.44,51.5,0.0,11.5,90.0,7.39,1.83
+SCN-053,Black soil,July-September,Vegetative growth and squaring,10.0,24.35,26.11,28.39,76.0,23.88,5.69,92.0,5.64,2.6
+SCN-054,Red soil,July-September,Vegetative growth and squaring,20.0,8.51,26.64,29.06,64.2,2.51,0.0,92.0,6.8,1.55
+SCN-055,Black soil,October-December,Vegetative growth and squaring,20.0,12.57,23.54,28.56,46.4,7.92,0.0,92.0,6.19,0.6
+SCN-056,Red soil,October-December,Vegetative growth and squaring,50.0,12.95,17.34,21.73,54.8,0.0,0.0,90.0,7.39,3.15
+SCN-057,Black soil,January-March,Flowering,10.0,27.73,22.75,27.42,41.3,4.52,0.0,90.0,8.11,1.45
+SCN-058,Red soil,January-March,Flowering,20.0,11.53,24.43,26.53,55.5,5.35,0.0,95.0,6.66,1.91
+SCN-059,Black soil,April-June,Flowering,20.0,22.88,38.06,41.91,52.5,0.0,0.0,90.0,6.04,0.24
+SCN-060,Red soil,April-June,Flowering,10.0,14.42,27.03,32.68,34.8,4.06,0.0,85.0,8.46,1.74
+SCN-061,Black soil,July-September,Flowering,20.0,36.73,26.95,29.77,80.9,33.23,12.03,92.0,7.14,0.33
+SCN-062,Red soil,July-September,Flowering,20.0,7.6,28.39,29.53,77.5,75.71,10.2,92.0,7.56,2.41
+SCN-063,Black soil,October-December,Flowering,50.0,20.6,20.42,25.21,72.3,0.0,5.95,92.0,5.85,0.81
+SCN-064,Red soil,October-December,Flowering,10.0,11.28,17.31,22.09,57.8,4.97,0.0,90.0,6.67,0.28
+SCN-065,Black soil,January-March,Boll development,50.0,21.03,26.99,33.66,22.3,0.0,0.0,95.0,6.03,0.2
+SCN-066,Red soil,January-March,Boll development,10.0,23.37,17.99,23.54,53.6,0.76,0.0,90.0,6.4,3.07
+SCN-067,Black soil,April-June,Boll development,20.0,25.35,28.01,31.02,41.5,0.0,0.0,90.0,5.99,0.26
+SCN-068,Red soil,April-June,Boll development,20.0,22.62,31.14,33.57,43.3,0.0,0.0,90.0,6.61,0.77
+SCN-069,Black soil,July-September,Boll development,10.0,19.06,24.06,29.96,92.7,0.0,13.74,85.0,7.9,0.64
+SCN-070,Red soil,July-September,Boll development,20.0,16.86,17.69,24.24,68.8,67.46,2.34,95.0,7.11,2.76
+SCN-071,Black soil,October-December,Boll development,20.0,20.57,28.67,32.76,55.3,0.0,0.0,85.0,7.38,1.47
+SCN-072,Red soil,October-December,Boll development,20.0,20.76,18.95,25.7,56.0,12.09,0.0,92.0,8.0,2.26
+SCN-073,Black soil,January-March,Boll opening and maturity,10.0,25.98,29.85,35.15,55.4,0.0,1.82,95.0,6.48,1.4
+SCN-074,Red soil,January-March,Boll opening and maturity,10.0,18.95,17.06,22.21,23.9,0.0,0.0,85.0,7.69,0.83
+SCN-075,Black soil,April-June,Boll opening and maturity,20.0,23.38,34.08,37.94,31.8,0.0,9.98,85.0,5.92,2.8
+SCN-076,Red soil,April-June,Boll opening and maturity,50.0,19.74,29.74,34.05,30.7,0.0,8.99,95.0,8.44,1.28
+SCN-077,Black soil,July-September,Boll opening and maturity,10.0,33.15,24.52,29.65,62.6,39.57,48.95,90.0,5.54,2.49
+SCN-078,Red soil,July-September,Boll opening and maturity,20.0,21.13,26.68,28.81,58.5,46.93,1.41,95.0,7.04,3.43
+SCN-079,Black soil,October-December,Boll opening and maturity,20.0,36.7,27.68,29.1,48.1,0.0,0.0,92.0,5.59,3.21
+SCN-080,Red soil,October-December,Boll opening and maturity,20.0,14.56,25.01,26.04,58.1,0.0,0.0,90.0,5.56,2.69
+SCN-081,Black soil,January-March,Establishment,20.0,12.61,25.19,28.74,20.3,5.13,0.0,92.0,5.63,1.67
+SCN-082,Red soil,January-March,Establishment,20.0,13.87,29.05,30.15,66.9,0.0,0.0,92.0,5.77,0.98
+SCN-083,Black soil,April-June,Establishment,50.0,23.87,28.01,33.09,37.6,0.0,0.0,95.0,6.13,0.24
+SCN-084,Red soil,April-June,Establishment,50.0,12.09,33.12,35.34,47.1,0.0,11.97,92.0,7.5,2.56
+SCN-085,Black soil,July-September,Establishment,20.0,27.08,29.68,31.87,90.1,3.4,22.76,85.0,6.91,2.8
+SCN-086,Red soil,July-September,Establishment,10.0,12.21,31.0,33.08,74.8,23.55,2.18,95.0,7.42,2.74
+SCN-087,Black soil,October-December,Establishment,50.0,34.0,31.11,33.73,79.1,0.0,0.0,90.0,7.84,1.62
+SCN-088,Red soil,October-December,Establishment,10.0,16.2,22.53,26.0,66.1,7.53,0.0,92.0,7.21,1.34
+SCN-089,Black soil,January-March,Vegetative growth and squaring,20.0,33.67,23.74,29.39,58.1,0.0,0.0,95.0,8.48,1.69
+SCN-090,Red soil,January-March,Vegetative growth and squaring,20.0,17.52,23.5,29.13,43.7,0.0,6.39,90.0,8.4,2.69
+SCN-091,Black soil,April-June,Vegetative growth and squaring,20.0,26.36,36.81,41.12,32.8,0.0,32.29,90.0,5.92,0.47
+SCN-092,Red soil,April-June,Vegetative growth and squaring,20.0,9.98,29.5,34.13,45.8,5.06,7.05,95.0,5.59,0.75
+SCN-093,Black soil,July-September,Vegetative growth and squaring,50.0,20.32,19.75,24.05,88.6,26.06,23.13,85.0,5.79,2.56
+SCN-094,Red soil,July-September,Vegetative growth and squaring,50.0,13.89,27.82,29.72,63.8,48.3,3.3,92.0,6.94,0.62
+SCN-095,Black soil,October-December,Vegetative growth and squaring,10.0,24.5,19.35,23.47,42.6,3.58,14.06,90.0,8.23,1.51
+SCN-096,Red soil,October-December,Vegetative growth and squaring,20.0,19.99,21.24,26.12,47.7,2.23,0.0,95.0,7.87,2.74
+SCN-097,Black soil,January-March,Flowering,10.0,24.9,29.97,33.41,24.0,1.46,0.0,85.0,5.76,2.23
+SCN-098,Red soil,January-March,Flowering,50.0,15.93,16.76,23.63,38.9,0.9,0.0,90.0,5.7,2.51
+SCN-099,Black soil,April-June,Flowering,20.0,16.67,29.14,34.53,27.6,0.0,0.0,85.0,8.02,2.56
+SCN-100,Red soil,April-June,Flowering,10.0,22.23,35.86,42.28,32.8,0.0,0.25,90.0,8.24,2.48

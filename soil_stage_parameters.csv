@@ -1,0 +1,11 @@
+soil_type,field_capacity_vwc_pct,saturation_vwc_pct,crop_stage,effective_root_zone_depth_cm,stage_sensitivity,parameter_status,parameter_note
+Black soil,36,53,Establishment,20,0.45,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Black soil,36,53,Vegetative growth and squaring,40,0.55,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Black soil,36,53,Flowering,60,0.95,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Black soil,36,53,Boll development,80,0.90,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Black soil,36,53,Boll opening and maturity,80,0.25,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Red soil,23,44,Establishment,20,0.45,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Red soil,23,44,Vegetative growth and squaring,40,0.55,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Red soil,23,44,Flowering,60,0.95,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Red soil,23,44,Boll development,80,0.90,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data
+Red soil,23,44,Boll opening and maturity,80,0.25,ILLUSTRATIVE PLACEHOLDER,Replace with verified local soil hydraulic measurements and crop-stage root-zone data

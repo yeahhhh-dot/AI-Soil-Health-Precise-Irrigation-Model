@@ -1,0 +1,1 @@
+scenario_id,soil_type,season,crop_stage,area_m2,current_soil_moisture_vwc_pct,soil_temperature_c,air_temperature_c,relative_humidity_pct,rainfall_previous_24h_mm,forecast_rain_next_24h_mm,irrigation_efficiency_pct,soil_ph,electrical_conductivity_ds_m
