@@ -1,214 +1,332 @@
-"""
-Cotton root-zone water calculator
-=================================
-Crop: cotton    Soil: black soil    Stage: flowering (Sept-Nov)
+"""Cotton root-zone water calculator.
 
-Question: how much water does it take to bring the soil around the roots
-(the root zone) up to SATURATION?
+Fixed study context: cotton, black soil, flowering stage (September-November).
+The app estimates water needed to reach a selected percentage (95–100%) of
+saturation in the specified root-zone volume. It is a simplified calculator,
+not a field-validated irrigation prescription.
 
-    root-zone soil volume  V  = volume of the root-zone shape (from width and depth)
-    water to add (litres)     = (saturation % - current moisture %) / 100 x V
-
-Every soil-water percentage here is VOLUMETRIC: the share of the soil's volume
-that is water.
-
-Run with:  streamlit run app.py
+Run with: streamlit run app.py
 """
 from __future__ import annotations
 
 import math
-
 import streamlit as st
 
-PARTICLE_DENSITY = 2.65  # g/cm3, standard value for mineral soil
+PARTICLE_DENSITY_G_CM3 = 2.65  # assumed mineral-particle density
+MAX_SATURATION_VWC_PCT = 80.0  # interface sanity bound for mineral-soil VWC
 
 SHAPES = {
-    "Cylinder (width = diameter)": "cylinder",
+    "Cylinder (width is diameter)": "cylinder",
     "Square block (width × width)": "block",
 }
-SAT_BY_PERCENT = "Saturation water content (%)"
-SAT_BY_DENSITY = "Bulk density (g/cm³)"
+SAT_BY_VWC = "Enter saturation water content (% VWC)"
+SAT_BY_BULK_DENSITY = "Estimate from bulk density (g/cm³)"
 
 
-# ----------------------------------------------------------------------------
-# Calculation (no Streamlit in here, so it can be tested on its own)
-# ----------------------------------------------------------------------------
 def root_zone_volume_l(width_cm: float, depth_cm: float, shape: str) -> float:
-    """Volume of soil in the root zone, in litres (1 L = 1000 cm³)."""
+    """Return the geometric soil volume per plant in litres."""
     if width_cm <= 0 or depth_cm <= 0:
-        raise ValueError("Width and root depth must both be greater than zero.")
+        raise ValueError("Root-zone width and depth must both be greater than zero.")
     if shape == "cylinder":
         volume_cm3 = math.pi * (width_cm / 2.0) ** 2 * depth_cm
     elif shape == "block":
         volume_cm3 = width_cm * width_cm * depth_cm
     else:
-        raise ValueError(f"Unknown shape: {shape!r}")
-    return volume_cm3 / 1000.0
+        raise ValueError(f"Unknown root-zone shape: {shape!r}")
+    return volume_cm3 / 1000.0  # 1000 cm³ = 1 litre
 
 
 def saturation_from_bulk_density(bulk_density_g_cm3: float) -> float:
-    """Saturation water content (% of soil volume) = total porosity."""
-    if not 0.5 <= bulk_density_g_cm3 < PARTICLE_DENSITY:
-        raise ValueError(f"Bulk density must be between 0.5 and {PARTICLE_DENSITY} g/cm³.")
-    return (1.0 - bulk_density_g_cm3 / PARTICLE_DENSITY) * 100.0
-
-
-def water_needed_l(volume_l: float, target_pct: float, current_pct: float) -> float:
-    """Litres needed to raise soil water from current_pct to target_pct (both % of soil volume)."""
-    if current_pct < 0 or target_pct < 0:
-        raise ValueError("Soil-water percentages cannot be negative.")
-    return max(0.0, (target_pct - current_pct) / 100.0 * volume_l)
+    """Estimate saturated VWC (%) from porosity and mineral particle density."""
+    if not 0.5 <= bulk_density_g_cm3 < PARTICLE_DENSITY_G_CM3:
+        raise ValueError(
+            f"Bulk density must be at least 0.5 and less than "
+            f"{PARTICLE_DENSITY_G_CM3:.2f} g/cm³."
+        )
+    return (1.0 - bulk_density_g_cm3 / PARTICLE_DENSITY_G_CM3) * 100.0
 
 
 def calculate(
     width_cm: float,
     depth_cm: float,
     shape: str,
-    saturation_pct: float,
-    current_pct: float,
-    field_capacity_pct: float | None = None,
+    saturation_vwc_pct: float,
+    current_vwc_pct: float,
+    target_saturation_pct: float,
     plants: int = 1,
-) -> dict:
-    """All results in litres, per plant unless the name says total."""
-    if not 0 < saturation_pct <= 100:
-        raise ValueError("Saturation water content must be between 0 and 100 %.")
-    if not 0 <= current_pct <= 100:
-        raise ValueError("Current soil moisture must be between 0 and 100 %.")
-    if plants < 1:
-        raise ValueError("Number of plants must be at least 1.")
+) -> dict[str, float | int | str]:
+    """Calculate target and water volumes per plant and for all plants.
 
-    volume = root_zone_volume_l(width_cm, depth_cm, shape)
-    to_saturation = water_needed_l(volume, saturation_pct, current_pct)
+    saturation_vwc_pct is the soil's actual water content at full saturation
+    (% of total soil volume). target_saturation_pct is the desired percentage
+    of that saturation level (95–100%), not a VWC percentage itself.
 
-    result = {
-        "soil_volume_l": volume,
-        "water_now_l": current_pct / 100.0 * volume,
-        "water_at_saturation_l": saturation_pct / 100.0 * volume,
-        "to_saturation_l": to_saturation,
-        "to_saturation_total_l": to_saturation * plants,
-        "to_field_capacity_l": None,
-        "above_field_capacity_l": None,
+    Assumes each plant has an identical, non-overlapping root-zone volume.
+    """
+    if not 0 < saturation_vwc_pct <= MAX_SATURATION_VWC_PCT:
+        raise ValueError(
+            f"Saturation water content must be above 0 and no more than "
+            f"{MAX_SATURATION_VWC_PCT:.0f}% VWC in this calculator."
+        )
+    if not 0 <= current_vwc_pct <= MAX_SATURATION_VWC_PCT:
+        raise ValueError(
+            f"Current soil moisture must be between 0 and "
+            f"{MAX_SATURATION_VWC_PCT:.0f}% VWC."
+        )
+    if current_vwc_pct > saturation_vwc_pct:
+        raise ValueError(
+            f"Current moisture ({current_vwc_pct:.2f}% VWC) cannot exceed the "
+            f"entered saturation water content ({saturation_vwc_pct:.2f}% VWC). "
+            "Check the units, sensor, or saturation value."
+        )
+    if not 95 <= target_saturation_pct <= 100:
+        raise ValueError("Target must be between 95% and 100% of saturation.")
+    if int(plants) != plants or plants < 1:
+        raise ValueError("Number of plants must be a whole number of at least 1.")
+
+    volume_l = root_zone_volume_l(width_cm, depth_cm, shape)
+    target_vwc_pct = saturation_vwc_pct * target_saturation_pct / 100.0
+
+    water_now_per_plant_l = current_vwc_pct / 100.0 * volume_l
+    water_at_saturation_per_plant_l = saturation_vwc_pct / 100.0 * volume_l
+    water_at_target_per_plant_l = target_vwc_pct / 100.0 * volume_l
+    water_needed_per_plant_l = max(
+        0.0, (target_vwc_pct - current_vwc_pct) / 100.0 * volume_l
+    )
+    plant_count = int(plants)
+
+    return {
+        "shape": shape,
+        "soil_volume_per_plant_l": volume_l,
+        "saturation_vwc_pct": saturation_vwc_pct,
+        "target_saturation_pct": target_saturation_pct,
+        "target_vwc_pct": target_vwc_pct,
+        "current_vwc_pct": current_vwc_pct,
+        "water_now_per_plant_l": water_now_per_plant_l,
+        "water_at_saturation_per_plant_l": water_at_saturation_per_plant_l,
+        "water_at_target_per_plant_l": water_at_target_per_plant_l,
+        "water_needed_per_plant_l": water_needed_per_plant_l,
+        "plants": plant_count,
+        "soil_volume_total_l": volume_l * plant_count,
+        "water_now_total_l": water_now_per_plant_l * plant_count,
+        "water_at_saturation_total_l": water_at_saturation_per_plant_l * plant_count,
+        "water_at_target_total_l": water_at_target_per_plant_l * plant_count,
+        "water_needed_total_l": water_needed_per_plant_l * plant_count,
     }
-    if field_capacity_pct is not None and 0 < field_capacity_pct < saturation_pct:
-        result["to_field_capacity_l"] = water_needed_l(volume, field_capacity_pct, current_pct)
-        result["above_field_capacity_l"] = (saturation_pct - field_capacity_pct) / 100.0 * volume
-    return result
 
 
-# ----------------------------------------------------------------------------
-# Page
-# ----------------------------------------------------------------------------
-def main() -> None:
-    st.set_page_config(page_title="Cotton Root-Zone Water Calculator", page_icon="🌱")
-    st.title("🌱 Cotton Root-Zone Water Calculator")
-    st.caption(
-        "Cotton · black soil · flowering stage (Sept–Nov) · "
-        "water needed to saturate the soil around the roots"
-    )
-
-    st.subheader("1. Root zone (the soil just around the roots)")
-    col_w, col_d = st.columns(2)
-    width_cm = col_w.number_input(
-        "Root-zone width (cm)", min_value=1.0, max_value=300.0, value=47.0, step=1.0, key="width_cm"
-    )
-    depth_cm = col_d.number_input(
-        "Root depth (cm)", min_value=1.0, max_value=300.0, value=25.0, step=1.0, key="depth_cm"
-    )
-    shape_label = st.radio("Shape of the root zone", list(SHAPES), horizontal=True, key="shape")
-    plants = st.number_input(
-        "Number of plants", min_value=1, max_value=1_000_000, value=1, step=1, key="plants"
-    )
-
-    st.subheader("2. Black soil")
-    sat_mode = st.radio(
-        "Give saturation as", [SAT_BY_PERCENT, SAT_BY_DENSITY], horizontal=True, key="sat_mode"
-    )
-    if sat_mode == SAT_BY_PERCENT:
-        saturation_pct = st.number_input(
-            "Saturation water content (% of soil volume)",
-            min_value=20.0, max_value=80.0, value=47.0, step=0.5, key="sat_pct",
-        )
-    else:
-        bulk_density = st.number_input(
-            "Bulk density (g/cm³)", min_value=0.8, max_value=2.0, value=1.40, step=0.01, key="bulk_density"
-        )
-        saturation_pct = saturation_from_bulk_density(bulk_density)
-        st.caption(
-            f"Saturation = (1 − {bulk_density:.2f} ÷ {PARTICLE_DENSITY}) × 100 "
-            f"= {saturation_pct:.1f} % of soil volume"
-        )
-    current_pct = st.number_input(
-        "Current soil moisture (% of soil volume)",
-        min_value=0.0, max_value=80.0, value=30.0, step=0.5, key="current_pct",
-    )
-    fc_pct = st.number_input(
-        "Field capacity (% of soil volume), used only for the comparison below",
-        min_value=5.0, max_value=80.0, value=36.0, step=0.5, key="fc_pct",
-    )
-
-    if current_pct > saturation_pct:
-        st.error(
-            f"Current moisture ({current_pct:.1f} %) is above saturation ({saturation_pct:.1f} %), "
-            "which is not possible. Check the units (it must be % of soil volume) or the sensor calibration."
-        )
-        return
-    try:
-        res = calculate(
-            width_cm, depth_cm, SHAPES[shape_label], saturation_pct, current_pct, fc_pct, int(plants)
-        )
-    except ValueError as exc:
-        st.error(str(exc))
-        return
+def show_results(result: dict[str, float | int | str]) -> None:
+    plants = int(result["plants"])
+    water_total = float(result["water_needed_total_l"])
+    water_per_plant = float(result["water_needed_per_plant_l"])
+    target_vwc = float(result["target_vwc_pct"])
+    target_sat = float(result["target_saturation_pct"])
+    saturation_vwc = float(result["saturation_vwc_pct"])
+    current_vwc = float(result["current_vwc_pct"])
 
     st.divider()
     st.subheader("Result")
-    col_a, col_b = st.columns(2)
-    col_a.metric(
-        "Water needed to reach saturation",
-        f"{res['to_saturation_l']:.2f} L",
-        help="Per plant: the water that fits into the empty pores of the root-zone soil.",
+    st.caption(
+        f"Target: {target_sat:.0f}% of saturation = {target_vwc:.2f}% VWC "
+        f"(full saturation is {saturation_vwc:.2f}% VWC)."
     )
-    col_b.metric("Root-zone soil volume", f"{res['soil_volume_l']:.2f} L")
-    st.caption(f"= {res['to_saturation_l'] * 1000:,.0f} mL per plant")
-    if int(plants) > 1:
-        st.metric(f"Total for {int(plants):,} plants", f"{res['to_saturation_total_l']:,.1f} L")
+    col1, col2, col3 = st.columns(3)
+    col1.metric(f"TOTAL water for {plants:,} plant(s)", f"{water_total:,.2f} L")
+    col2.metric("Water per plant", f"{water_per_plant:,.3f} L")
+    col3.metric("Root-zone volume per plant", f"{float(result['soil_volume_per_plant_l']):,.2f} L")
 
-    st.markdown(
-        "| Quantity (per plant) | Litres |\n"
-        "|---|---|\n"
-        f"| Soil in the root zone | {res['soil_volume_l']:.2f} |\n"
-        f"| Water already in the soil ({current_pct:.1f} %) | {res['water_now_l']:.2f} |\n"
-        f"| Water the soil holds at saturation ({saturation_pct:.1f} %) | {res['water_at_saturation_l']:.2f} |\n"
-        f"| **Water to add** | **{res['to_saturation_l']:.2f}** |"
-    )
-
-    if res["to_field_capacity_l"] is not None:
-        st.info(
-            f"**For comparison:** bringing the same soil only to field capacity ({fc_pct:.1f} %) "
-            f"needs {res['to_field_capacity_l']:.2f} L. Of the water the soil holds at saturation, "
-            f"about {res['above_field_capacity_l']:.2f} L sits above field capacity and drains away. "
-            "Black soil drains slowly, so a saturated root zone can stay waterlogged, "
-            "which cotton tolerates poorly."
+    if current_vwc >= target_vwc:
+        st.success(
+            "The current moisture is already at or above the selected target. "
+            "The calculated additional water requirement is 0 L."
         )
     else:
-        st.warning("Field capacity must be lower than saturation, so the comparison is hidden.")
+        st.info(
+            f"To reach the selected target, the simplified calculation estimates "
+            f"{water_per_plant:.3f} L per plant, or {water_total:,.2f} L for "
+            f"{plants:,} plant(s)."
+        )
 
-    with st.expander("How this is calculated"):
+    per_plant_volume = float(result["soil_volume_per_plant_l"])
+    total_volume = float(result["soil_volume_total_l"])
+    lines = [
+        "| Quantity | Per plant | Total for all plants |",
+        "|---|---:|---:|",
+        f"| Root-zone soil volume | {per_plant_volume:.3f} L | {total_volume:.3f} L |",
+        f"| Water currently in root zone | {float(result['water_now_per_plant_l']):.3f} L | {float(result['water_now_total_l']):.3f} L |",
+        f"| Water at selected target | {float(result['water_at_target_per_plant_l']):.3f} L | {float(result['water_at_target_total_l']):.3f} L |",
+        f"| Water at full saturation | {float(result['water_at_saturation_per_plant_l']):.3f} L | {float(result['water_at_saturation_total_l']):.3f} L |",
+        f"| **Additional water needed** | **{water_per_plant:.3f} L** | **{water_total:.3f} L** |",
+    ]
+    st.markdown("\n".join(lines))
+
+    st.warning(
+        "This total multiplies the per-plant result by the plant count, assuming "
+        "identical, non-overlapping root zones. In a real field, neighbouring root "
+        "zones can overlap, so multiplying may overestimate total water."
+    )
+
+
+def main() -> None:
+    st.set_page_config(page_title="Cotton Root-Zone Water Calculator", page_icon="🌱", layout="centered")
+    st.title("🌱 Cotton Root-Zone Water Calculator")
+    st.caption("Cotton · black soil · flowering stage (September–November)")
+    st.write(
+        "Calculate the water needed to bring the specified soil volume around the "
+        "roots to **95–100% of its saturation level**. Measurements are volumetric "
+        "water content (VWC), unless stated otherwise."
+    )
+
+    with st.expander("What do the two percentages mean?", expanded=True):
         st.markdown(
-            "1. **Root-zone soil volume**: cylinder = π × (width ÷ 2)² × depth; "
-            "square block = width × width × depth. Centimetres give cm³, and 1000 cm³ = 1 litre.\n"
-            "2. **Water in the soil now** = current moisture % ÷ 100 × soil volume.\n"
-            "3. **Water at saturation** = saturation % ÷ 100 × soil volume.\n"
-            "4. **Water to add** = (saturation % − current %) ÷ 100 × soil volume, never below zero.\n\n"
-            "**Check these before trusting the number**\n\n"
-            "- Moisture and saturation must be *volumetric* (% of soil volume). "
-            "A reading in % of dry-soil weight becomes volumetric when you multiply by bulk density.\n"
-            "- 47 % saturation is a textbook figure for clay, not a measurement of your field. "
-            "To get your own, measure bulk density: saturation = (1 − bulk density ÷ 2.65) × 100.\n"
-            "- The result is the water that fits into the pores of the block of soil you described. "
-            "In a real field some water spreads sideways and downward past that block."
+            "- **Saturation water content (% VWC):** the actual percentage of the "
+            "whole soil volume that would be water when the soil pores are full. "
+            "This is a soil property, usually estimated from porosity or measured.\n"
+            "- **Target (% of saturation):** how close you want to get to that "
+            "full-saturation level. This separate control is restricted to **95–100%**.\n"
+            "- Example: if saturation is 47% VWC, a target of 95% of saturation "
+            "means 44.65% VWC—not 95% VWC.\n"
+            "- The 80% maximum applies only to the entered saturation VWC. It is a "
+            "sanity bound for this mineral-soil calculator, not the target. A VWC of "
+            "95–100% would leave practically no soil volume for solid particles."
+        )
+
+    st.subheader("1. Root-zone dimensions and plant count")
+    st.caption("Width and depth describe the root-zone volume for ONE plant.")
+
+    error_message = None
+    submitted = False
+    submitted_values = None
+
+    with st.form("water_calculation_form", clear_on_submit=False, border=True):
+        col_w, col_d = st.columns(2)
+        width_cm = col_w.number_input(
+            "Root-zone width (cm)", min_value=1.0, max_value=300.0,
+            value=47.0, step=1.0, key="width_cm"
+        )
+        depth_cm = col_d.number_input(
+            "Root depth (cm)", min_value=1.0, max_value=300.0,
+            value=25.0, step=1.0, key="depth_cm"
+        )
+        shape_label = st.radio(
+            "Root-zone shape", list(SHAPES), horizontal=True, key="shape_label",
+            help="Cylinder uses width as its diameter. Square block uses width × width."
+        )
+        plants = st.number_input(
+            "Number of plants", min_value=1, max_value=1_000_000,
+            value=1, step=1, key="plants"
+        )
+
+        st.subheader("2. Black-soil water measurements")
+        sat_mode = st.radio(
+            "How will you set full-saturation water content?",
+            [SAT_BY_VWC, SAT_BY_BULK_DENSITY], horizontal=True, key="sat_mode"
+        )
+        if sat_mode == SAT_BY_VWC:
+            saturation_vwc_pct = st.number_input(
+                "Full-saturation water content (% VWC)",
+                min_value=1.0, max_value=MAX_SATURATION_VWC_PCT,
+                value=47.0, step=0.5, key="saturation_vwc_pct",
+                help="This is the soil's full-saturation VWC, not the target percent of saturation."
+            )
+            bulk_density = None
+        else:
+            bulk_density = st.number_input(
+                "Bulk density (g/cm³)", min_value=0.5, max_value=2.5,
+                value=1.40, step=0.01, key="bulk_density",
+                help="Used to estimate porosity assuming mineral particle density of 2.65 g/cm³."
+            )
+            saturation_vwc_pct = saturation_from_bulk_density(float(bulk_density))
+            st.caption(
+                f"Estimated full-saturation VWC = (1 − {bulk_density:.2f} ÷ "
+                f"{PARTICLE_DENSITY_G_CM3:.2f}) × 100 = {saturation_vwc_pct:.2f}% VWC. "
+                "This is an estimate; measured porosity is preferable."
+            )
+
+        target_saturation_pct = st.slider(
+            "Target saturation (% of full saturation)",
+            min_value=95, max_value=100, value=95, step=1,
+            key="target_saturation_pct",
+            help="95 means 95% of the saturation VWC; 100 means full saturation."
+        )
+        st.caption(
+            f"Current target from the settings above: "
+            f"{saturation_vwc_pct * target_saturation_pct / 100.0:.2f}% VWC."
+        )
+        current_vwc_pct = st.number_input(
+            "Current soil moisture (% VWC)", min_value=0.0,
+            max_value=MAX_SATURATION_VWC_PCT, value=30.0, step=0.5,
+            key="current_vwc_pct",
+            help="Enter volumetric water content, not percent of dry soil weight."
+        )
+        submitted = st.form_submit_button(
+            "Calculate / Check water requirement", type="primary", use_container_width=True
+        )
+
+        submitted_values = {
+            "width_cm": float(width_cm),
+            "depth_cm": float(depth_cm),
+            "shape": SHAPES[shape_label],
+            "saturation_vwc_pct": float(saturation_vwc_pct),
+            "current_vwc_pct": float(current_vwc_pct),
+            "target_saturation_pct": float(target_saturation_pct),
+            "plants": int(plants),
+            "sat_mode": sat_mode,
+            "bulk_density": None if bulk_density is None else float(bulk_density),
+        }
+
+    if submitted:
+        try:
+            result = calculate(
+                width_cm=submitted_values["width_cm"],
+                depth_cm=submitted_values["depth_cm"],
+                shape=submitted_values["shape"],
+                saturation_vwc_pct=submitted_values["saturation_vwc_pct"],
+                current_vwc_pct=submitted_values["current_vwc_pct"],
+                target_saturation_pct=submitted_values["target_saturation_pct"],
+                plants=submitted_values["plants"],
+            )
+            st.session_state["last_result"] = result
+            st.session_state["last_inputs"] = submitted_values
+            st.session_state.pop("last_error", None)
+        except ValueError as exc:
+            st.session_state.pop("last_result", None)
+            st.session_state.pop("last_inputs", None)
+            st.session_state["last_error"] = str(exc)
+
+    if "last_error" in st.session_state:
+        st.error(st.session_state["last_error"])
+    elif "last_result" in st.session_state:
+        st.subheader("3. Calculated result")
+        show_results(st.session_state["last_result"])
+        st.caption("Results shown are from the last time you pressed the calculation button.")
+    else:
+        st.info("Adjust the measurements above, then press **Calculate / Check water requirement**.")
+
+    with st.expander("Calculation method and assumptions"):
+        st.markdown(
+            "**1. Root-zone volume per plant**\n\n"
+            "Cylinder: π × (width ÷ 2)² × depth. Square block: width × width × depth. "
+            "Dimensions are in cm; divide cm³ by 1000 to convert to litres.\n\n"
+            "**2. Convert target saturation to target VWC**\n\n"
+            "Target VWC (%) = full-saturation VWC (%) × target saturation (%) ÷ 100.\n\n"
+            "**3. Water needed per plant**\n\n"
+            "max(0, target VWC − current VWC) ÷ 100 × root-zone volume (L).\n\n"
+            "**4. Total for the selected number of plants**\n\n"
+            "Water per plant × number of plants. The same multiplication is shown for "
+            "the total soil volume and water stored in the root zone.\n\n"
+            "**Why no field-capacity control?**\n\n"
+            "Field capacity is removed from this version because the requested calculation "
+            "is for 95–100% of saturation. Field capacity is a different soil-water state "
+            "and is not needed in this particular formula.\n\n"
+            "**Limits of the estimate**\n\n"
+            "The answer assumes the stated shape and dimensions represent the soil around "
+            "one plant and that the current moisture is uniform throughout that volume. "
+            "Root zones may overlap in a real field, and delivering the calculated water "
+            "does not guarantee that the soil can safely absorb it without drainage or ponding."
         )
 
 
 if __name__ == "__main__":
     main()
+
