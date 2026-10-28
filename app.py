@@ -1,314 +1,214 @@
+"""
+Cotton root-zone water calculator
+=================================
+Crop: cotton    Soil: black soil    Stage: flowering (Sept-Nov)
+
+Question: how much water does it take to bring the soil around the roots
+(the root zone) up to SATURATION?
+
+    root-zone soil volume  V  = volume of the root-zone shape (from width and depth)
+    water to add (litres)     = (saturation % - current moisture %) / 100 x V
+
+Every soil-water percentage here is VOLUMETRIC: the share of the soil's volume
+that is water.
+
+Run with:  streamlit run app.py
+"""
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+import math
 
-import pandas as pd
 import streamlit as st
 
-from irrigation_logic import (
-    CROP_STAGES,
-    SEASONS,
-    SOIL_TYPES,
-    evaluate_scenario,
-    get_parameter_row,
-    load_parameter_table,
-)
+PARTICLE_DENSITY = 2.65  # g/cm3, standard value for mineral soil
 
-APP_DIR = Path(__file__).resolve().parent
-PARAMETER_FILE = APP_DIR / "soil_stage_parameters.csv"
-DEMO_FILE = APP_DIR / "demo_100_conditions.csv"
-TEMPLATE_FILE = APP_DIR / "data_template.csv"
+SHAPES = {
+    "Cylinder (width = diameter)": "cylinder",
+    "Square block (width × width)": "block",
+}
+SAT_BY_PERCENT = "Saturation water content (%)"
+SAT_BY_DENSITY = "Bulk density (g/cm³)"
 
-st.set_page_config(
-    page_title="Cotton Fuzzy Drip Irrigation Simulator",
-    page_icon="🌱",
-    layout="wide",
-)
 
-st.title("🌱 Cotton Drip Irrigation Simulator")
-st.caption("Fuzzy-logic decision support + transparent soil-water balance | Cotton · Khandesh, North Maharashtra")
-
-st.warning(
-    "CLASSROOM DEMO ONLY: The included field-capacity, saturation, root-depth and fuzzy-stage settings are illustrative placeholders, "
-    "not verified measurements for a particular Khandesh farm. Replace them with locally relevant published or measured values before "
-    "making research claims or real irrigation decisions. The 100 sample rows are synthetic test scenarios; fuzzy logic does not train on them."
-)
-
-try:
-    parameters = load_parameter_table(str(PARAMETER_FILE))
-except Exception as exc:
-    st.error(f"Could not load soil_stage_parameters.csv: {exc}")
-    st.stop()
-
-with st.expander("How the model works (read this before interpreting the result)", expanded=False):
-    st.markdown(
-        """
-        1. Select **black soil or red soil**, the season, and the cotton growth stage; enter the current conditions.
-        2. The fuzzy controller uses the root-zone moisture deficit relative to field capacity, crop-stage sensitivity, approximate
-        soil temperature, vapour-pressure deficit (from air temperature and relative humidity), and forecast rainfall to choose a target between
-        **95% and 100% of field capacity** and estimate irrigation priority.
-        3. The water-balance calculation turns the chosen target into refill depth, litres for the selected area, and the theoretical
-        flow needed to deliver that volume in exactly one hour.
-        4. Previous rainfall is shown as context but is **not subtracted again** from the current moisture reading. Forecast rain affects
-        the fuzzy urgency signal only; it is not deducted from the theoretical refill volume if you irrigate now.
-
-        **Key assumption:** current VWC represents the average water content over the selected effective root-zone depth. A single shallow
-        sensor reading may not represent the whole root zone. The requested L/h is the flow needed to apply the calculated refill in one hour,
-        not a claim that the soil or a real drip system can safely accept that rate.
-
-        pH and electrical conductivity are displayed as soil-health context; they do not arbitrarily increase or decrease the water-volume equation.
-        Season is recorded for context but does not apply an unsupported seasonal multiplier. Stage affects effective root depth and fuzzy sensitivity.
-        """
-    )
-
-single_tab, batch_tab, params_tab = st.tabs(["Single scenario", "Test 100 scenarios", "Parameter table"])
-
-with single_tab:
-    st.subheader("1. Field and crop settings")
-    c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.8, 1.1])
-    with c1:
-        soil_type = st.selectbox("Soil type", SOIL_TYPES, index=0)
-    with c2:
-        season = st.selectbox("Time of year", SEASONS, index=1)
-    with c3:
-        crop_stage = st.selectbox("Cotton growth stage", CROP_STAGES, index=2)
-    with c4:
-        area_m2 = st.number_input("Field area (m²)", min_value=0.1, max_value=1_000_000.0, value=20.0, step=1.0)
-
-    defaults = get_parameter_row(parameters, soil_type, crop_stage)
-
-    with st.expander("2. Soil/crop parameters used for the calculation (editable)", expanded=True):
-        st.info(
-            "These defaults are placeholders to make the simulator runnable. Replace them with reliable measurements or published values "
-            "for the selected soil profile and crop stage. Editing here affects this single-scenario calculation only; update "
-            "soil_stage_parameters.csv to change the batch defaults."
-        )
-        p1, p2, p3, p4 = st.columns(4)
-        with p1:
-            field_capacity = st.number_input(
-                "Field capacity (% VWC)", min_value=1.0, max_value=60.0,
-                value=float(defaults["field_capacity_vwc_pct"]), step=0.5, key=f"fc_{soil_type}_{crop_stage}"
-            )
-        with p2:
-            saturation = st.number_input(
-                "Saturation (% VWC)", min_value=2.0, max_value=80.0,
-                value=float(defaults["saturation_vwc_pct"]), step=0.5, key=f"sat_{soil_type}_{crop_stage}"
-            )
-        with p3:
-            root_depth_cm = st.number_input(
-                "Effective root-zone depth (cm)", min_value=1.0, max_value=150.0,
-                value=float(defaults["effective_root_zone_depth_cm"]), step=5.0, key=f"depth_{soil_type}_{crop_stage}"
-            )
-        with p4:
-            efficiency_pct = st.number_input(
-                "Drip application efficiency (%)", min_value=1.0, max_value=100.0,
-                value=90.0, step=1.0, key="single_efficiency"
-            )
-        st.caption(f"Parameter status: {defaults.get('parameter_status', 'not specified')} · {defaults.get('parameter_note', '')}")
-
-    st.subheader("3. Current virtual sensor readings")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        moisture_default = min(17.0, float(saturation))
-        current_moisture = st.slider(
-            "Current soil moisture (% VWC)", min_value=0.0,
-            max_value=float(max(1.0, saturation)), value=float(moisture_default), step=0.5,
-            key=f"moisture_{soil_type}",
-            help="Use volumetric water content (% of total soil volume), not an uncalibrated sensor percentage. Ideally this is root-zone-average VWC."
-        )
-        soil_temp = st.slider("Soil temperature (°C)", min_value=-5.0, max_value=70.0, value=28.0, step=0.5)
-        soil_ph = st.slider("Soil pH (screening only)", min_value=0.0, max_value=14.0, value=7.0, step=0.1)
-    with c2:
-        air_temp = st.slider("Air temperature (°C)", min_value=-10.0, max_value=60.0, value=32.0, step=0.5)
-        humidity = st.slider("Relative humidity (%)", min_value=0.0, max_value=100.0, value=40.0, step=1.0)
-        ec = st.number_input("Electrical conductivity (dS/m; screening only)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
-    with c3:
-        rain_previous = st.number_input(
-            "Rainfall in previous 24 hours (mm)", min_value=0.0, max_value=500.0, value=0.0, step=1.0,
-            help="Context only; not subtracted again because current soil moisture should already reflect rain that reached the root zone."
-        )
-        rain_forecast = st.number_input(
-            "Forecast rainfall in next 24 hours (mm)", min_value=0.0, max_value=100.0, value=0.0, step=1.0,
-            help="Used by fuzzy logic to adjust target selection within 95–100% of field capacity and to adjust urgency. It is not deducted from the theoretical refill volume if irrigating now."
-        )
-        st.metric("Region", "Khandesh, North Maharashtra")
-        st.metric("Crop", "Cotton")
-
-    st.subheader("4. Calculated irrigation requirement")
-    if field_capacity >= saturation:
-        st.error("Invalid soil parameters: field capacity must be lower than saturation.")
-    elif current_moisture > saturation:
-        st.error("Current moisture is greater than the saturation value for the selected parameter set. Check the units/parameters.")
+# ----------------------------------------------------------------------------
+# Calculation (no Streamlit in here, so it can be tested on its own)
+# ----------------------------------------------------------------------------
+def root_zone_volume_l(width_cm: float, depth_cm: float, shape: str) -> float:
+    """Volume of soil in the root zone, in litres (1 L = 1000 cm³)."""
+    if width_cm <= 0 or depth_cm <= 0:
+        raise ValueError("Width and root depth must both be greater than zero.")
+    if shape == "cylinder":
+        volume_cm3 = math.pi * (width_cm / 2.0) ** 2 * depth_cm
+    elif shape == "block":
+        volume_cm3 = width_cm * width_cm * depth_cm
     else:
-        scenario = {
-            "soil_type": soil_type,
-            "season": season,
-            "crop_stage": crop_stage,
-            "area_m2": area_m2,
-            "current_soil_moisture_vwc_pct": current_moisture,
-            "soil_temperature_c": soil_temp,
-            "air_temperature_c": air_temp,
-            "relative_humidity_pct": humidity,
-            "rainfall_previous_24h_mm": rain_previous,
-            "forecast_rain_next_24h_mm": rain_forecast,
-            "soil_ph": soil_ph,
-            "electrical_conductivity_ds_m": ec,
-            "irrigation_efficiency_pct": efficiency_pct,
-        }
-        overrides = {
-            "field_capacity_vwc_pct": field_capacity,
-            "saturation_vwc_pct": saturation,
-            "effective_root_zone_depth_cm": root_depth_cm,
-        }
-        try:
-            result = evaluate_scenario(scenario, parameters, parameter_overrides=overrides)
-        except Exception as exc:
-            st.error(f"Cannot calculate this scenario: {exc}")
-        else:
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("Required flow for 1 hour", f"{result['required_flow_for_one_hour_lph']:,.1f} L/h")
-            k2.metric("Gross water volume", f"{result['gross_water_volume_l']:,.1f} L")
-            k3.metric("Gross refill depth", f"{result['gross_applied_depth_mm']:.2f} mm")
-            k4.metric("Target VWC", f"{result['target_moisture_vwc_pct']:.2f}%")
+        raise ValueError(f"Unknown shape: {shape!r}")
+    return volume_cm3 / 1000.0
 
-            k5, k6, k7, k8 = st.columns(4)
-            k5.metric("Net refill depth", f"{result['net_refill_depth_mm']:.2f} mm")
-            k6.metric("Net water volume", f"{result['net_water_volume_l']:,.1f} L")
-            k7.metric("Target selected by fuzzy logic", f"{result['target_pct_of_field_capacity']:.2f}% of FC")
-            k8.metric("Vapour-pressure deficit", f"{result['vapour_pressure_deficit_kpa']:.2f} kPa")
 
-            if result["irrigation_needed_now"]:
-                st.info(f"**Fuzzy priority: {result['fuzzy_priority']}** (score {result['fuzzy_priority_score']:.1f}/100). {result['recommendation']}")
-            else:
-                st.success(result["recommendation"])
+def saturation_from_bulk_density(bulk_density_g_cm3: float) -> float:
+    """Saturation water content (% of soil volume) = total porosity."""
+    if not 0.5 <= bulk_density_g_cm3 < PARTICLE_DENSITY:
+        raise ValueError(f"Bulk density must be between 0.5 and {PARTICLE_DENSITY} g/cm³.")
+    return (1.0 - bulk_density_g_cm3 / PARTICLE_DENSITY) * 100.0
 
-            with st.expander("Calculation details"):
-                st.code(
-                    "target VWC = field capacity × fuzzy target fraction\n"
-                    "net refill depth (mm) = max(0, target VWC − current VWC) / 100 × root depth (mm)\n"
-                    "net volume (L) = net refill depth (mm) × area (m²)\n"
-                    "gross volume (L) = net volume / (drip efficiency / 100)\n"
-                    "required flow (L/h) = gross volume (L) / 1 hour"
-                )
-                detail_cols = [
-                    "field_capacity_vwc_pct", "saturation_vwc_pct", "effective_root_zone_depth_cm",
-                    "current_soil_moisture_vwc_pct", "target_moisture_vwc_pct", "deficit_pct_of_field_capacity",
-                    "net_refill_depth_mm", "gross_applied_depth_mm", "net_water_volume_l", "gross_water_volume_l",
-                    "irrigation_efficiency_pct", "fuzzy_priority_score", "fuzzy_priority", "parameter_status"
-                ]
-                st.dataframe(pd.DataFrame([{key: result[key] for key in detail_cols}]), use_container_width=True)
 
-            st.warning(
-                "This is the theoretical flow needed to apply the estimated root-zone refill volume within one hour. "
-                "If the number is large, it does not mean a drip system should actually apply that flow continuously: "
-                "the field's irrigation design and soil's ability to accept water need separate engineering/agronomic review."
-            )
+def water_needed_l(volume_l: float, target_pct: float, current_pct: float) -> float:
+    """Litres needed to raise soil water from current_pct to target_pct (both % of soil volume)."""
+    if current_pct < 0 or target_pct < 0:
+        raise ValueError("Soil-water percentages cannot be negative.")
+    return max(0.0, (target_pct - current_pct) / 100.0 * volume_l)
 
-with batch_tab:
-    st.subheader("Test the logic against 100 sample observations")
-    st.write(
-        "The included 100 rows are synthetic input scenarios for testing the same fuzzy rules and water-balance calculation. "
-        "They are **not training data**, field measurements, or evidence of real-world prediction accuracy."
+
+def calculate(
+    width_cm: float,
+    depth_cm: float,
+    shape: str,
+    saturation_pct: float,
+    current_pct: float,
+    field_capacity_pct: float | None = None,
+    plants: int = 1,
+) -> dict:
+    """All results in litres, per plant unless the name says total."""
+    if not 0 < saturation_pct <= 100:
+        raise ValueError("Saturation water content must be between 0 and 100 %.")
+    if not 0 <= current_pct <= 100:
+        raise ValueError("Current soil moisture must be between 0 and 100 %.")
+    if plants < 1:
+        raise ValueError("Number of plants must be at least 1.")
+
+    volume = root_zone_volume_l(width_cm, depth_cm, shape)
+    to_saturation = water_needed_l(volume, saturation_pct, current_pct)
+
+    result = {
+        "soil_volume_l": volume,
+        "water_now_l": current_pct / 100.0 * volume,
+        "water_at_saturation_l": saturation_pct / 100.0 * volume,
+        "to_saturation_l": to_saturation,
+        "to_saturation_total_l": to_saturation * plants,
+        "to_field_capacity_l": None,
+        "above_field_capacity_l": None,
+    }
+    if field_capacity_pct is not None and 0 < field_capacity_pct < saturation_pct:
+        result["to_field_capacity_l"] = water_needed_l(volume, field_capacity_pct, current_pct)
+        result["above_field_capacity_l"] = (saturation_pct - field_capacity_pct) / 100.0 * volume
+    return result
+
+
+# ----------------------------------------------------------------------------
+# Page
+# ----------------------------------------------------------------------------
+def main() -> None:
+    st.set_page_config(page_title="Cotton Root-Zone Water Calculator", page_icon="🌱")
+    st.title("🌱 Cotton Root-Zone Water Calculator")
+    st.caption(
+        "Cotton · black soil · flowering stage (Sept–Nov) · "
+        "water needed to saturate the soil around the roots"
     )
+
+    st.subheader("1. Root zone (the soil just around the roots)")
+    col_w, col_d = st.columns(2)
+    width_cm = col_w.number_input(
+        "Root-zone width (cm)", min_value=1.0, max_value=300.0, value=47.0, step=1.0, key="width_cm"
+    )
+    depth_cm = col_d.number_input(
+        "Root depth (cm)", min_value=1.0, max_value=300.0, value=25.0, step=1.0, key="depth_cm"
+    )
+    shape_label = st.radio("Shape of the root zone", list(SHAPES), horizontal=True, key="shape")
+    plants = st.number_input(
+        "Number of plants", min_value=1, max_value=1_000_000, value=1, step=1, key="plants"
+    )
+
+    st.subheader("2. Black soil")
+    sat_mode = st.radio(
+        "Give saturation as", [SAT_BY_PERCENT, SAT_BY_DENSITY], horizontal=True, key="sat_mode"
+    )
+    if sat_mode == SAT_BY_PERCENT:
+        saturation_pct = st.number_input(
+            "Saturation water content (% of soil volume)",
+            min_value=20.0, max_value=80.0, value=47.0, step=0.5, key="sat_pct",
+        )
+    else:
+        bulk_density = st.number_input(
+            "Bulk density (g/cm³)", min_value=0.8, max_value=2.0, value=1.40, step=0.01, key="bulk_density"
+        )
+        saturation_pct = saturation_from_bulk_density(bulk_density)
+        st.caption(
+            f"Saturation = (1 − {bulk_density:.2f} ÷ {PARTICLE_DENSITY}) × 100 "
+            f"= {saturation_pct:.1f} % of soil volume"
+        )
+    current_pct = st.number_input(
+        "Current soil moisture (% of soil volume)",
+        min_value=0.0, max_value=80.0, value=30.0, step=0.5, key="current_pct",
+    )
+    fc_pct = st.number_input(
+        "Field capacity (% of soil volume), used only for the comparison below",
+        min_value=5.0, max_value=80.0, value=36.0, step=0.5, key="fc_pct",
+    )
+
+    if current_pct > saturation_pct:
+        st.error(
+            f"Current moisture ({current_pct:.1f} %) is above saturation ({saturation_pct:.1f} %), "
+            "which is not possible. Check the units (it must be % of soil volume) or the sensor calibration."
+        )
+        return
     try:
-        demo_df = pd.read_csv(DEMO_FILE)
-    except Exception as exc:
-        st.error(f"Could not read demo_100_conditions.csv: {exc}")
-        st.stop()
+        res = calculate(
+            width_cm, depth_cm, SHAPES[shape_label], saturation_pct, current_pct, fc_pct, int(plants)
+        )
+    except ValueError as exc:
+        st.error(str(exc))
+        return
 
-    uploaded = st.file_uploader("Optionally upload your own scenario CSV", type=["csv"], key="batch_upload")
-    if uploaded is not None:
-        try:
-            input_df = pd.read_csv(uploaded)
-            dataset_label = f"Uploaded: {uploaded.name}"
-        except Exception as exc:
-            st.error(f"Could not read uploaded CSV: {exc}")
-            st.stop()
-    else:
-        input_df = demo_df
-        dataset_label = "Built-in synthetic 100-observation test set"
-
-    st.caption(f"Dataset: {dataset_label} · Rows: {len(input_df)}")
-    st.dataframe(input_df.head(12), use_container_width=True)
-    st.download_button(
-        "Download the 100-observation sample CSV",
-        data=demo_df.to_csv(index=False).encode("utf-8"),
-        file_name="demo_100_conditions.csv",
-        mime="text/csv",
+    st.divider()
+    st.subheader("Result")
+    col_a, col_b = st.columns(2)
+    col_a.metric(
+        "Water needed to reach saturation",
+        f"{res['to_saturation_l']:.2f} L",
+        help="Per plant: the water that fits into the empty pores of the root-zone soil.",
     )
-    st.download_button(
-        "Download input CSV template",
-        data=pd.read_csv(TEMPLATE_FILE).to_csv(index=False).encode("utf-8"),
-        file_name="data_template.csv",
-        mime="text/csv",
+    col_b.metric("Root-zone soil volume", f"{res['soil_volume_l']:.2f} L")
+    st.caption(f"= {res['to_saturation_l'] * 1000:,.0f} mL per plant")
+    if int(plants) > 1:
+        st.metric(f"Total for {int(plants):,} plants", f"{res['to_saturation_total_l']:,.1f} L")
+
+    st.markdown(
+        "| Quantity (per plant) | Litres |\n"
+        "|---|---|\n"
+        f"| Soil in the root zone | {res['soil_volume_l']:.2f} |\n"
+        f"| Water already in the soil ({current_pct:.1f} %) | {res['water_now_l']:.2f} |\n"
+        f"| Water the soil holds at saturation ({saturation_pct:.1f} %) | {res['water_at_saturation_l']:.2f} |\n"
+        f"| **Water to add** | **{res['to_saturation_l']:.2f}** |"
     )
 
-    required_input = [
-        "scenario_id", "soil_type", "season", "crop_stage", "area_m2",
-        "current_soil_moisture_vwc_pct", "soil_temperature_c", "air_temperature_c",
-        "relative_humidity_pct", "rainfall_previous_24h_mm", "forecast_rain_next_24h_mm",
-        "irrigation_efficiency_pct", "soil_ph", "electrical_conductivity_ds_m",
-    ]
-    missing = [col for col in required_input if col not in input_df.columns]
-    if missing:
-        st.error("The CSV is missing these required columns: " + ", ".join(missing))
+    if res["to_field_capacity_l"] is not None:
+        st.info(
+            f"**For comparison:** bringing the same soil only to field capacity ({fc_pct:.1f} %) "
+            f"needs {res['to_field_capacity_l']:.2f} L. Of the water the soil holds at saturation, "
+            f"about {res['above_field_capacity_l']:.2f} L sits above field capacity and drains away. "
+            "Black soil drains slowly, so a saturated root zone can stay waterlogged, "
+            "which cotton tolerates poorly."
+        )
     else:
-        results: list[dict[str, Any]] = []
-        for _, in_row in input_df.iterrows():
-            scenario = in_row.to_dict()
-            try:
-                output = evaluate_scenario(scenario, parameters)
-                output["processing_status"] = "OK"
-                output["error_message"] = ""
-            except Exception as exc:
-                output = {"scenario_id": scenario.get("scenario_id", ""), "soil_type": scenario.get("soil_type", ""),
-                          "season": scenario.get("season", ""), "crop_stage": scenario.get("crop_stage", ""),
-                          "processing_status": "ERROR", "error_message": str(exc)}
-            results.append(output)
-        result_df = pd.DataFrame(results)
-        success_n = int((result_df["processing_status"] == "OK").sum())
-        error_n = len(result_df) - success_n
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Rows processed", f"{len(result_df)}")
-        m2.metric("Successful", f"{success_n}")
-        m3.metric("Rows with errors", f"{error_n}")
+        st.warning("Field capacity must be lower than saturation, so the comparison is hidden.")
 
-        display_cols = [
-            "scenario_id", "soil_type", "season", "crop_stage", "current_soil_moisture_vwc_pct",
-            "target_moisture_vwc_pct", "net_refill_depth_mm", "gross_water_volume_l",
-            "required_flow_for_one_hour_lph", "fuzzy_priority", "irrigation_needed_now",
-            "processing_status", "error_message",
-        ]
-        existing_display = [col for col in display_cols if col in result_df.columns]
-        st.dataframe(result_df[existing_display], use_container_width=True, height=440)
-        st.download_button(
-            "Download all processed outputs as CSV",
-            data=result_df.to_csv(index=False).encode("utf-8"),
-            file_name="cotton_fuzzy_irrigation_results.csv",
-            mime="text/csv",
+    with st.expander("How this is calculated"):
+        st.markdown(
+            "1. **Root-zone soil volume**: cylinder = π × (width ÷ 2)² × depth; "
+            "square block = width × width × depth. Centimetres give cm³, and 1000 cm³ = 1 litre.\n"
+            "2. **Water in the soil now** = current moisture % ÷ 100 × soil volume.\n"
+            "3. **Water at saturation** = saturation % ÷ 100 × soil volume.\n"
+            "4. **Water to add** = (saturation % − current %) ÷ 100 × soil volume, never below zero.\n\n"
+            "**Check these before trusting the number**\n\n"
+            "- Moisture and saturation must be *volumetric* (% of soil volume). "
+            "A reading in % of dry-soil weight becomes volumetric when you multiply by bulk density.\n"
+            "- 47 % saturation is a textbook figure for clay, not a measurement of your field. "
+            "To get your own, measure bulk density: saturation = (1 − bulk density ÷ 2.65) × 100.\n"
+            "- The result is the water that fits into the pores of the block of soil you described. "
+            "In a real field some water spreads sideways and downward past that block."
         )
 
-with params_tab:
-    st.subheader("Soil and crop-stage parameter table")
-    st.write(
-        "This file controls the default field capacity, saturation, effective root-zone depth, and fuzzy stage-sensitivity value. "
-        "Every current row is explicitly an illustrative placeholder. Replace it with defensible values before describing the output as research-based."
-    )
-    st.dataframe(parameters, use_container_width=True)
-    st.download_button(
-        "Download soil_stage_parameters.csv",
-        data=parameters.to_csv(index=False).encode("utf-8"),
-        file_name="soil_stage_parameters.csv",
-        mime="text/csv",
-    )
-    st.markdown(
-        "**How to update parameters:** edit the CSV while preserving the column names and one row per soil/stage combination, "
-        "then commit the updated file to the same GitHub repository as `app.py`. Streamlit will redeploy from the repository."
-    )
 
-st.divider()
-st.caption(
-    "Model type: hand-authored Mamdani-style fuzzy inference + deterministic soil-water balance. "
-    "There is no supervised model training in this version. Use for education and software testing, not direct farm operation."
-)
+if __name__ == "__main__":
+    main()
